@@ -1,0 +1,225 @@
+{% extends "layout.html" %}
+
+{% block title %}我的持仓{% endblock %}
+
+{% block head %}
+{{ super() }}
+<!-- 针对此页面的额外样式 -->
+<style>
+    .summary-card {
+    background-color: #343a40;
+    border-radius: 1rem;
+    }
+    .purchase-card {
+    background-color: #343a40;
+    border-radius: 0.75rem;
+    margin-bottom: 0.75rem;
+    }
+    .cost-tag {
+    background-color: #ffc107;
+    color: #000;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.5rem 0.5rem 0.5rem 0;
+    font-weight: bold;
+    }
+    .profit-positive {
+    color: #dc3545;
+    }
+    .profit-negative {
+    color: #198754;
+    }
+    .form-control, .form-select {
+    background-color: #495057;
+    border-color: #6c757d;
+    color: #fff;
+    }
+    /* 下拉菜单内的表单样式 */
+    .dropdown-menu-form {
+    min-width: 300px;
+    padding: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- 顶部总结卡片 -->
+    <div class="summary-card p-4 mb-4 text-white">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="text-secondary">总重量(克)</span>
+            <i class="fas fa-eye" id="toggle-visibility" style="cursor: pointer;"></i>
+        </div>
+        <h1 class="display-4 fw-bold mb-4" id="total-grams-display">{{ total_grams }}</h1>
+        <div class="row text-center" id="summary-details">
+            <div class="col">
+                <small class="text-secondary">购入总价(元)</small>
+                <h5 class="fw-light">{{ "{:,.2f}".format(total_amount) }}</h5>
+            </div>
+            <div class="col">
+                <small class="text-secondary">预估价值(元)</small>
+                <h5 class="fw-light">{{ "{:,.2f}".format(total_current_value) }}</h5>
+            </div>
+            <div class="col">
+                <small class="text-secondary">预估收益(元)</small>
+                <h5 class="fw-bold {{ 'profit-positive' if total_profit_loss >= 0 else 'profit-negative' }}">
+                    {{ "{:,.2f}".format(total_profit_loss) }}
+                </h5>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加持仓按钮 与 筛选/排序下拉菜单 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <button class="btn btn-warning btn-lg" data-bs-toggle="modal" data-bs-target="#addPurchaseModal">
+            <i class="fas fa-plus-circle"></i> 添加持仓
+        </button>
+
+        <div class="dropdown">
+            <button class="btn btn-outline-secondary btn-lg dropdown-toggle" type="button" id="filterDropdown"
+                    data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                <i class="fas fa-filter"></i> 筛选与排序
+            </button>
+            <div class="dropdown-menu dropdown-menu-end dropdown-menu-form" aria-labelledby="filterDropdown">
+                <form id="filter-form" method="GET" action="{{ url_for('portfolio') }}">
+                    <div class="mb-3">
+                        <label for="sort_by" class="form-label">排序方式</label>
+                        <select name="sort_by" id="sort_by" class="form-select filter-control">
+                            <option value="date_desc" {% if current_sort==
+                            'date_desc' %}selected{% endif %}>按日期降序</option>
+                            <option value="date_asc" {% if current_sort==
+                            'date_asc' %}selected{% endif %}>按日期升序</option>
+                            <option value="weight_desc" {% if current_sort==
+                            'weight_desc' %}selected{% endif %}>按重量降序</option>
+                            <option value="weight_asc" {% if current_sort==
+                            'weight_asc' %}selected{% endif %}>按重量升序</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">日期范围</label>
+                        <div class="input-group">
+                            <input type="date" name="start_date" id="start_date" class="form-control filter-control"
+                                   value="{{ start_date or '' }}">
+                            <span class="input-group-text">-</span>
+                            <input type="date" name="end_date" id="end_date" class="form-control filter-control"
+                                   value="{{ end_date or '' }}">
+                        </div>
+                    </div>
+                    <button type="button" id="reset-filters" class="btn btn-sm btn-outline-light w-100">重置筛选
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 持仓列表 -->
+    {% for p in purchases %}
+    <div class="purchase-card p-3 text-white">
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="cost-tag mb-1">{{ p.cost_per_gram }}元/克</div>
+                <h5 class="mb-1">{{ p.description }}</h5>
+                <p class="text-secondary mb-0">
+                    <i class="fab fa-bitcoin text-warning"></i> {{ p.grams }}克 {{ p.amount }}元
+                </p>
+            </div>
+            <div class="text-end">
+                <h5 class="mb-1 fw-bold {{ 'profit-positive' if p.profit_loss >= 0 else 'profit-negative' }}">
+                    收益: {{ '{:+.2f}'.format(p.profit_loss) }}
+                </h5>
+                <small class="text-secondary">{{ p.transaction_date.strftime('%Y.%m.%d') }}</small>
+                <a href="{{ url_for('delete_purchase', id=p.id) }}" class="btn btn-sm btn-outline-danger ms-2"
+                   onclick="return confirm('确定删除吗？')"><i class="fas fa-trash"></i></a>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center text-secondary mt-5">
+        <p>暂无持仓记录，点击上方按钮添加第一笔吧！</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 添加持仓 Modal -->
+<div class="modal fade" id="addPurchaseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加新持仓</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('add_purchase') }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">持仓描述</label>
+                        <input type="text" name="description" class="form-control" placeholder="例如: 建行金条"
+                               required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">类型</label>
+                        <select name="metal_type" class="form-select">
+                            <option value="gold">黄金</option>
+                            <option value="silver">白银</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">购入重量 (克)</label>
+                        <input type="number" step="0.01" name="grams" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">购入总金额 (元)</label>
+                        <input type="number" step="0.01" name="amount" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">购入日期</label>
+                        <input type="date" name="transaction_date" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="submit" class="btn btn-warning">确认添加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- 针对此页面的额外 JS (即选即筛功能) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+    // 眼睛图标切换显示
+    const toggleBtn = document.getElementById('toggle-visibility');
+    const gramsDisplay = document.getElementById('total-grams-display');
+    const summaryDetails = document.getElementById('summary-details');
+
+    toggleBtn.addEventListener('click', function() {
+    this.classList.toggle('fa-eye');
+    this.classList.toggle('fa-eye-slash');
+    gramsDisplay.classList.toggle('d-none');
+    summaryDetails.classList.toggle('d-none');
+    });
+
+    // 自动提交筛选表单
+    const filterForm = document.getElementById('filter-form');
+    const filterControls = document.querySelectorAll('.filter-control');
+
+    filterControls.forEach(control => {
+    control.addEventListener('change', function() {
+    filterForm.submit();
+    });
+    });
+
+    // 重置筛选按钮
+    const resetBtn = document.getElementById('reset-filters');
+    resetBtn.addEventListener('click', function() {
+    document.getElementById('start_date').value = '';
+    document.getElementById('end_date').value = '';
+    document.getElementById('sort_by').value = 'date_desc';
+    filterForm.submit();
+    });
+    });
+</script>
+{% endblock %}

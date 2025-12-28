@@ -1,0 +1,57 @@
+{# templates/partials/metal_info.html 的正确代码 #}
+
+{% if current_metal == 'gold' %}
+    {% set data = price_data.gold %}
+    {% set analytics = gold_analytics %}
+    {% set chart_id = 'goldPriceChart' %}
+{% else %}
+    {% set data = price_data.silver %}
+    {% set analytics = silver_analytics %}
+    {% set chart_id = 'silverPriceChart' %}
+{% endif %}
+
+<!-- 实时价格卡片 -->
+<div class="card shadow-2-strong text-center mb-3">
+    <div class="card-body">
+        <h2 class="card-title mb-1">¥ {{ data.price }}/克</h2>
+        <p class="card-text {{ 'text-danger' if data.change_percent >= 0 else 'text-success' }}">
+            <i class="fas fa-arrow-{{ 'up' if data.change_percent >= 0 else 'down' }}"></i>
+            {{ '+' if data.change_percent >= 0 else '' }}{{ data.change_percent }}%
+        </p>
+    </div>
+</div>
+
+<!-- 价格图表卡片 -->
+<div class="card shadow-2-strong mb-3">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">近30日{{ '金' if current_metal == 'gold' else '银' }}价走势图</h5>
+    </div>
+    <div class="card-body" style="height: 250px;">
+        <canvas id="{{ chart_id }}"></canvas>
+    </div>
+</div>
+
+<!-- 价格分析卡片 -->
+<div class="card shadow-2-strong">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">{{ '金' if current_metal == 'gold' else '银' }}价分析</h5>
+    </div>
+    <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            近7日均价 <span>¥ {{ analytics.avg_7 }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            近15日均价 <span>¥ {{ analytics.avg_15 }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            近30日均价 <span>¥ {{ analytics.avg_30 }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            当前价格
+            <span class="{{ 'text-danger fw-bold' if data.price == analytics.min_30 else '' }}">
+                ¥ {{ data.price }}
+                {% if data.price == analytics.min_30 %} (30日最低!) {% endif %}
+            </span>
+        </li>
+    </ul>
+</div>

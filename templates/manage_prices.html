@@ -1,0 +1,111 @@
+{% extends "layout.html" %}
+
+{% block title %}价格管理{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="text-white mb-4">价格管理</h2>
+
+    <!-- 添加/编辑表单卡片 -->
+    <div class="card text-white bg-dark mb-4">
+        <div class="card-body">
+            <h5 class="card-title" id="form-title">添加新价格</h5>
+            <form id="price-form" method="POST" action="{{ url_for('manage_prices') }}">
+                <input type="hidden" name="record_id" id="record_id">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="date" class="form-label">日期</label>
+                        <input type="date" class="form-control" id="date" name="date" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="metal_type" class="form-label">类型</label>
+                        <select class="form-select" id="metal_type" name="metal_type">
+                            <option value="gold">黄金</option>
+                            <option value="silver">白银</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="price" class="form-label">价格 (元/克)</label>
+                        <input type="number" step="0.001" class="form-control" id="price" name="price" required>
+                    </div>
+                    <div class="col-md-3 align-self-end">
+                        <button type="submit" class="btn btn-warning w-100">保存</button>
+                        <button type="button" class="btn btn-secondary w-100 mt-2 d-none" id="cancel-edit">取消编辑</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 历史价格列表 -->
+    <h3 class="text-white mb-3">历史价格列表</h3>
+    <div class="table-responsive">
+        <table class="table table-dark table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>类型</th>
+                    <th>价格</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for price in prices %}
+                <tr>
+                    <td>{{ price.date.strftime('%Y-%m-%d') }}</td>
+                    <td>{{ '黄金' if price.metal_type == 'gold' else '白银' }}</td>
+                    <td>{{ price.price }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning edit-btn"
+                                data-id="{{ price.id }}"
+                                data-date="{{ price.date.strftime('%Y-%m-%d') }}"
+                                data-type="{{ price.metal_type }}"
+                                data-price="{{ price.price }}">
+                            编辑
+                        </button>
+                        <a href="{{ url_for('delete_price', price_id=price.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除这条记录吗？')">
+                            删除
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const editButtons = document.querySelectorAll('.edit-btn');
+        const form = document.getElementById('price-form');
+        const formTitle = document.getElementById('form-title');
+        const recordIdInput = document.getElementById('record_id');
+        const dateInput = document.getElementById('date');
+        const typeInput = document.getElementById('metal_type');
+        const priceInput = document.getElementById('price');
+        const cancelBtn = document.getElementById('cancel-edit');
+
+        editButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                formTitle.textContent = '编辑价格';
+                recordIdInput.value = this.dataset.id;
+                dateInput.value = this.dataset.date;
+                typeInput.value = this.dataset.type;
+                priceInput.value = this.dataset.price;
+                cancelBtn.classList.remove('d-none');
+                window.scrollTo(0, 0); // 滚动到页面顶部以显示表单
+            });
+        });
+
+        cancelBtn.addEventListener('click', function() {
+            formTitle.textContent = '添加新价格';
+            form.reset();
+            recordIdInput.value = '';
+            this.classList.add('d-none');
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+:root {
+    --body-bg: #212529;
+    --card-bg: #343a40;
+    --text-color: #f8f9fa;
+    --border-color: #495057;
+    --header-color: #ffffff;
+}
+body { color: var(--text-color) !important; }
+.card, .list-group-item, .bottom-nav, .form-control, .form-select {
+    background-color: var(--card-bg) !important;
+    color: var(--text-color) !important;
+    border-color: var(--border-color) !important;
+}
+.display-6, .display-5, .card-title, .nav-link, h1, h2, h3, h5, strong {
+    color: var(--header-color) !important;
+}
+.bottom-nav .nav-link.active {
+    color: #0d6efd !important;
+}
+.table {
+    --bs-table-color: var(--text-color);
+    --bs-table-striped-color: var(--text-color);
+    --bs-table-border-color: var(--border-color);
+}
