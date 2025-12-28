@@ -19,6 +19,15 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import requests
 from bs4 import BeautifulSoup
+import pickle
+from pathlib import Path
+# 邮件发送相关导入
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+
+from flask_mail import Mail, Message
 
 # --- App 和数据库配置 ---
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -35,6 +44,20 @@ migrate = Migrate(app, db)
 CONFIG_USERNAME = "Fred"
 CONFIG_PASSWORD = "Woshiliyuan12@."
 
+ALERT_COOLDOWN_FILE = Path(basedir) / "instance" / "alert_cooldown.pkl"
+ALERT_COOLDOWN_HOURS = 4  # 同一预警4小时内只发送一次
+
+# --- 邮件配置 ---
+MAIL_CONFIG = {
+    "smtp_server": "smtp.qq.com",
+    "smtp_port": 465,
+    "sender_email": "1040001060@qq.com",  # ← 替换为您的QQ邮箱
+    "sender_password": "gezwtfwxnksubbjj",  # ← 替换为您的授权码
+    "sender_name": "黄金持仓系统",
+    "recipients": ["2240912272@qq.com", "1040001060@qq.com"]
+}
+
+mail = Mail(app)
 
 # --- 数据库模型 ---
 class DailyPrice(db.Model):
@@ -142,9 +165,194 @@ def fetch_and_update_price():
                 db.session.add(DailyPrice(date=today, metal_type=metal, price=price))
         db.session.commit()
         print(f"Database updated: Gold {gold_price}, Silver {silver_price}")
+
+        # === 新增：价格预警检查 ===
+        # 检查黄金价格
+        gold_alerts = check_price_alert("gold", gold_price)
+        if gold_alerts:
+            send_price_alert_email("gold", gold_alerts)
+
+        # 检查白银价格
+        silver_alerts = check_price_alert("silver", silver_price)
+        if silver_alerts:
+            send_price_alert_email("silver", silver_alerts)
+        # === 预警检查结束 ===
+
     except Exception as e:
         print(f"An error occurred: {e}")
         db.session.rollback()
+
+
+def check_price_alert(metal_type, current_price):
+    """检查价格是否触发预警条件"""
+    alerts = []
+
+    today = datetime.today().date()
+    periods = {
+        "7日": 7,
+        "15日": 15,
+        "30日": 30
+    }
+
+    for period_name, days in periods.items():
+        start_date = today - timedelta(days=days - 1)
+        records = (
+            DailyPrice.query.filter(
+                DailyPrice.metal_type == metal_type,
+                DailyPrice.date >= start_date,
+                DailyPrice.date <= today
+            )
+            .all()
+        )
+
+        if records:
+            prices = [r.price for r in records]
+            min_price = min(prices)
+
+            # 如果当前价格等于或低于该区间最低价，触发预警
+            if current_price <= min_price:
+                alerts.append({
+                    "period": period_name,
+                    "min_price": min_price,
+                    "current_price": current_price
+                })
+
+    return alerts
+
+
+def send_price_alert_email(metal_type, alerts):
+    """发送价格预警邮件（HTML格式，UTF-8编码）"""
+    if not alerts:
+        return
+
+    # 加载上次发送记录（冷却期检查）
+    cooldown_data = {}
+    if ALERT_COOLDOWN_FILE.exists():
+        try:
+            with open(ALERT_COOLDOWN_FILE, "rb") as f:
+                cooldown_data = pickle.load(f)
+        except:
+            pass
+
+    # 检查冷却期
+    now = datetime.now()
+    alert_key = f"{metal_type}_{'_'.join([a['period'] for a in alerts])}"
+
+    if alert_key in cooldown_data:
+        last_sent = cooldown_data[alert_key]
+        if (now - last_sent).total_seconds() < ALERT_COOLDOWN_HOURS * 3600:
+            print(f"[{now}] 预警 {alert_key} 在冷却期内，跳过发送")
+            return
+
+    metal_name = "黄金" if metal_type == "gold" else "白银"
+    periods = "、".join([a["period"] for a in alerts])
+
+    # 构建预警表格行
+    alert_rows = ""
+    for alert in alerts:
+        alert_rows += f"""
+        <tr>
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">{alert['period']}</td>
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: center; color: #d9534f; font-weight: bold;">{alert['current_price']} 元/克</td>
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">{alert['min_price']} 元/克</td>
+        </tr>
+        """
+
+    # 构建HTML邮件内容
+    html_content = f"""
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body {{ font-family: Arial, 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9; }}
+            .header {{ background-color: #f8d7da; padding: 20px; border-radius: 5px; margin-bottom: 20px; text-align: center; }}
+            .header h2 {{ margin: 0; color: #721c24; }}
+            .content {{ background-color: white; padding: 20px; border-radius: 5px; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            th {{ background-color: #f2f2f2; padding: 12px; border: 1px solid #ddd; text-align: center; font-weight: bold; }}
+            .tip-box {{ background-color: #d1ecf1; padding: 15px; border-radius: 5px; border-left: 4px solid #0c5460; margin: 20px 0; }}
+            .footer {{ margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; text-align: center; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h2>⚠️ {metal_name}价格预警</h2>
+            </div>
+
+            <div class="content">
+                <p>尊敬的用户，您好！</p>
+
+                <p>系统检测到<strong style="color: #d9534f;">{metal_name}</strong>价格已触发预警条件，当前价格已达到或低于以下时间段的最低价：</p>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间段</th>
+                            <th>当前价格</th>
+                            <th>区间最低价</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {alert_rows}
+                    </tbody>
+                </table>
+
+                <div class="tip-box">
+                    💡 <strong>提示：</strong>这可能是一个较好的购买时机，请您关注市场动态，结合自身情况做出决策。
+                </div>
+
+                <div class="footer">
+                    <p>此邮件由黄金持仓追踪系统自动发送</p>
+                    <p>发送时间：{now.strftime('%Y-%m-%d %H:%M:%S')}</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+    # 创建邮件
+    msg = MIMEMultipart('alternative')
+    msg['From'] = formataddr((MAIL_CONFIG["sender_name"], MAIL_CONFIG["sender_email"]))
+    msg['To'] = ", ".join(MAIL_CONFIG["recipients"])
+    msg['Subject'] = f"{metal_name}价格预警：达到{periods}最低点"
+
+    html_part = MIMEText(html_content, 'html', 'utf-8')
+    msg.attach(html_part)
+
+    # 发送邮件（关键修改：使用 as_bytes() 而不是 as_string()）
+    try:
+        server = smtplib.SMTP_SSL(
+            MAIL_CONFIG["smtp_server"],
+            MAIL_CONFIG["smtp_port"]
+        )
+        server.login(
+            MAIL_CONFIG["sender_email"],
+            MAIL_CONFIG["sender_password"]
+        )
+        # ===== 关键修改：使用 send_message() 方法 =====
+        server.send_message(msg)
+        # ===== 或者使用 sendmail() + as_bytes() =====
+        # server.sendmail(
+        #     MAIL_CONFIG["sender_email"],
+        #     MAIL_CONFIG["recipients"],
+        #     msg.as_bytes()  # 改为 as_bytes()
+        # )
+        server.quit()
+        print(f"[{now}] ✓ 价格预警邮件已发送：{metal_name} - {periods}")
+
+        # 记录发送时间（冷却期）
+        cooldown_data[alert_key] = now
+        ALERT_COOLDOWN_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(ALERT_COOLDOWN_FILE, "wb") as f:
+            pickle.dump(cooldown_data, f)
+
+    except Exception as e:
+        print(f"[{now}] ✗ 邮件发送失败：{e}")
+        import traceback
+        traceback.print_exc()
 
 
 # --- Flask 路由 ---
@@ -390,6 +598,24 @@ def init_db_command():
         os.makedirs(instance_path)
     db.create_all()
     print("Initialized the database.")
+
+
+@app.route("/test-email")
+@login_required
+def test_email_route():
+    """测试邮件发送功能"""
+    try:
+        # 创建模拟预警数据
+        test_alerts = [
+            {"period": "7日", "current_price": 685.50, "min_price": 685.50},
+            {"period": "15日", "current_price": 685.50, "min_price": 687.20}
+        ]
+        send_price_alert_email("gold", test_alerts)
+        flash("测试邮件已发送，请检查收件箱！", "success")
+    except Exception as e:
+        flash(f"邮件发送失败：{str(e)}", "danger")
+
+    return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
