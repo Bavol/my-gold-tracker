@@ -4,7 +4,40 @@
 
 {% block content %}
 <div class="container">
-    <h1 class="text-white mb-4">实时行情</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-white mb-0">实时行情</h1>
+    </div>
+
+    <!-- 时间筛选区域 -->
+    <div class="bg-dark p-3 rounded mb-4">
+        <!-- 快捷按钮（始终显示） -->
+        <div class="btn-group btn-group-sm w-100 mb-2" role="group">
+            <button type="button" class="btn btn-outline-secondary" data-days="7">近7日</button>
+            <button type="button" class="btn btn-outline-secondary" data-days="15">近15日</button>
+            <button type="button" class="btn btn-outline-secondary" data-days="30">近30日</button>
+            <button type="button" class="btn btn-outline-warning" id="toggle-custom-date">
+                <i class="fas fa-calendar-alt"></i> 自定义日期
+            </button>
+        </div>
+
+        <!-- 自定义日期选择器（默认隐藏） -->
+        <form method="GET" action="{{ url_for('index') }}" id="date-range-form" style="display: none;">
+            <div class="row g-2 align-items-end mt-2">
+                <div class="col-md-5">
+                    <label for="start_date" class="form-label small text-secondary">开始日期</label>
+                    <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+                </div>
+                <div class="col-md-5">
+                    <label for="end_date" class="form-label small text-secondary">结束日期</label>
+                    <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-warning">查询</button>
+                </div>
+            </div>
+        </form>
+    </div>
+
     <div class="row">
         <!-- 黄金行情卡片 -->
         <div class="col-md-6 mb-4">
@@ -15,21 +48,12 @@
                     <p class="card-text display-4">{{ "%.2f"|format(price_data.gold.price) }} <small
                             class="fs-5 text-secondary">元/克</small></p>
 
-                    <!-- === 按照您的要求，重新格式化的数据分析区域 === -->
-                    <div class="mb-3">
-                        <p class="card-text text-secondary mb-1 small">
-                            7日均价: <span class="fw-bold text-white">{{ gold_analytics.avg_7 }} 元</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                            7日最低: <span class="fw-bold text-white">{{ gold_analytics.min_7 }} 元</span>
-                        </p>
-                        <p class="card-text text-secondary mb-1 small">
-                            15日均价: <span class="fw-bold text-white">{{ gold_analytics.avg_15 }} 元</span> &nbsp;&nbsp;&nbsp;
-                            15日最低: <span class="fw-bold text-white">{{ gold_analytics.min_15 }} 元</span>
-                        </p>
-                        <p class="card-text text-secondary mb-1 small">
-                            30日均价: <span class="fw-bold text-white">{{ gold_analytics.avg_30 }} 元</span> &nbsp;&nbsp;&nbsp;
-                            30日最低: <span class="fw-bold text-white">{{ gold_analytics.min_30 }} 元</span>
-                        </p>
-                    </div>
+                    <p class="card-text text-secondary mb-3">
+                        区间均价: <span class="fw-bold text-white">{{ gold_analytics.avg }} 元</span>
+                    </p>
+                    <p class="card-text text-secondary mb-3">
+                        区间最低: <span class="fw-bold text-white">{{ gold_analytics.min }} 元</span>
+                    </p>
 
                     <div class="mt-auto">
                         <canvas id="goldChart"></canvas>
@@ -46,21 +70,12 @@
                     <p class="card-text display-4">{{ "%.3f"|format(price_data.silver.price) }} <small
                             class="fs-5 text-secondary">元/克</small></p>
 
-                    <!-- === 按照您的要求，重新格式化的数据分析区域 === -->
-                    <div class="mb-3">
-                        <p class="card-text text-secondary mb-1 small">
-                            7日均价: <span class="fw-bold text-white">{{ silver_analytics.avg_7 }} 元</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                            7日最低: <span class="fw-bold text-white">{{ silver_analytics.min_7 }} 元</span>
-                        </p>
-                        <p class="card-text text-secondary mb-1 small">
-                            15日均价: <span class="fw-bold text-white">{{ silver_analytics.avg_15 }} 元</span> &nbsp;&nbsp;&nbsp;
-                            15日最低: <span class="fw-bold text-white">{{ silver_analytics.min_15 }} 元</span>
-                        </p>
-                        <p class="card-text text-secondary mb-1 small">
-                            30日均价: <span class="fw-bold text-white">{{ silver_analytics.avg_30 }} 元</span> &nbsp;&nbsp;&nbsp;
-                            30日最低: <span class="fw-bold text-white">{{ silver_analytics.min_30 }} 元</span>
-                        </p>
-                    </div>
+                    <p class="card-text text-secondary mb-3">
+                        区间均价: <span class="fw-bold text-white">{{ silver_analytics.avg }} 元</span>
+                    </p>
+                    <p class="card-text text-secondary mb-3">
+                        区间最低: <span class="fw-bold text-white">{{ silver_analytics.min }} 元</span>
+                    </p>
 
                     <div class="mt-auto">
                         <canvas id="silverChart"></canvas>
@@ -76,51 +91,123 @@
 {{ super() }}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // ... (JavaScript for charts remains unchanged) ...
-    // 黄金图表
-    const goldCtx = document.getElementById('goldChart').getContext('2d');
-    new Chart(goldCtx, {
-    type: 'line',
-    data: {
-    labels: {{ gold_chart_labels|safe }},
-    datasets: [{
-    label: '金价 (元/克)',
-    data: {{ gold_chart_data|safe }},
-    borderColor: 'rgba(255, 193, 7, 1)',
-    backgroundColor: 'rgba(255, 193, 7, 0.2)',
-    borderWidth: 2,
-    tension: 0.3,
-    fill: true
-    }]
-    },
-    options: {
-    scales: { y: { beginAtZero: false } },
-    plugins: { legend: { display: false } },
-    maintainAspectRatio: false
-    }
+    document.addEventListener('DOMContentLoaded', function() {
+        const presetButtons = document.querySelectorAll('.btn-group button[data-days]');
+        const toggleButton = document.getElementById('toggle-custom-date');
+        const customDateForm = document.getElementById('date-range-form');
+        const startDateInput = document.getElementById('start_date');
+        const endDateInput = document.getElementById('end_date');
+
+        // 页面加载时,根据当前URL参数高亮对应的按钮
+        function updateActiveButton() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const startDate = urlParams.get('start_date');
+            const endDate = urlParams.get('end_date');
+
+            if (startDate && endDate) {
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+                // 移除所有按钮的 active 状态
+                presetButtons.forEach(btn => btn.classList.remove('active'));
+
+                // 根据天数差异高亮对应按钮
+                presetButtons.forEach(btn => {
+                    const btnDays = parseInt(btn.getAttribute('data-days'), 10);
+                    if (btnDays === diffDays) {
+                        btn.classList.add('active');
+                    }
+                });
+            } else {
+                // 如果没有URL参数,默认高亮30日
+                presetButtons.forEach(btn => btn.classList.remove('active'));
+                const defaultBtn = document.querySelector('button[data-days="30"]');
+                if (defaultBtn) {
+                    defaultBtn.classList.add('active');
+                }
+            }
+        }
+
+        // 初始化时更新按钮状态
+        updateActiveButton();
+
+        // 切换自定义日期表单的显示/隐藏
+        toggleButton.addEventListener('click', function() {
+            if (customDateForm.style.display === 'none') {
+                customDateForm.style.display = 'block';
+                this.classList.add('active');
+            } else {
+                customDateForm.style.display = 'none';
+                this.classList.remove('active');
+            }
+        });
+
+        // 快捷按钮功能
+        presetButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const days = parseInt(this.getAttribute('data-days'), 10);
+                const endDate = new Date();
+                const startDate = new Date();
+                startDate.setDate(endDate.getDate() - (days - 1));
+
+                const formatYmd = (date) => date.toISOString().slice(0, 10);
+
+                // 构造URL并跳转
+                const url = new URL(window.location.href);
+                url.searchParams.set('start_date', formatYmd(startDate));
+                url.searchParams.set('end_date', formatYmd(endDate));
+                window.location.href = url.toString();
+            });
+        });
     });
 
-    // 白银图表
+    const goldCtx = document.getElementById('goldChart').getContext('2d');
+    new Chart(goldCtx, {
+        type: 'line',
+        data: {
+            labels: {{ gold_chart_labels|safe }},
+            datasets: [{
+                label: '金价',
+                data: {{ gold_chart_data|safe }},
+                borderColor: 'rgba(255, 193, 7, 1)',
+                backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: false } },
+            plugins: {
+                legend: { display: false }
+            },
+            maintainAspectRatio: false
+        }
+    });
+
     const silverCtx = document.getElementById('silverChart').getContext('2d');
     new Chart(silverCtx, {
-    type: 'line',
-    data: {
-    labels: {{ silver_chart_labels|safe }},
-    datasets: [{
-    label: '银价 (元/克)',
-    data: {{ silver_chart_data|safe }},
-    borderColor: 'rgba(206, 212, 218, 1)',
-    backgroundColor: 'rgba(206, 212, 218, 0.2)',
-    borderWidth: 2,
-    tension: 0.3,
-    fill: true
-    }]
-    },
-    options: {
-    scales: { y: { beginAtZero: false } },
-    plugins: { legend: { display: false } },
-    maintainAspectRatio: false
-    }
+        type: 'line',
+        data: {
+            labels: {{ silver_chart_labels|safe }},
+            datasets: [{
+                label: '银价',
+                data: {{ silver_chart_data|safe }},
+                borderColor: 'rgba(206, 212, 218, 1)',
+                backgroundColor: 'rgba(206, 212, 218, 0.2)',
+                borderWidth: 2,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            scales: { y: { beginAtZero: false } },
+            plugins: {
+                legend: { display: false }
+            },
+            maintainAspectRatio: false
+        }
     });
 </script>
 {% endblock %}
