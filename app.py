@@ -27,8 +27,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 
-from flask_mail import Mail, Message
-
 # --- App 和数据库配置 ---
 basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
@@ -56,8 +54,6 @@ MAIL_CONFIG = {
     "sender_name": "黄金持仓系统",
     "recipients": ["2240912272@qq.com", "1040001060@qq.com"]
 }
-
-mail = Mail(app)
 
 # --- 数据库模型 ---
 class DailyPrice(db.Model):
