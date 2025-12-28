@@ -1,187 +1,140 @@
----
+# 黄金持仓追踪器 (Gold Portfolio Tracker)
 
-### **项目部署文档：个人贵金属持仓追踪器 (Selenium版)**
+![Python Version](https://img.shields.io/badge/Python-3.9-blue.svg)![Flask](https://img.shields.io/badge/Flask-2.3.3-orange.svg)![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-#### 1. 项目概述
+一个功能完善的个人黄金/白银持仓追踪Web应用。它能自动从网络获取最新的金银价格，帮助用户管理自己的持仓记录，并实时计算收益情况。
 
-本项目是一个基于Flask和Selenium的个人贵金属投资追踪应用。它由两个核心部分组成：
-1.  **Web应用 (`app.py`)**: 由Gunicorn运行，负责处理用户请求、展示行情数据和持仓信息。
-2.  **后台抓取服务 (`scheduler.py`)**: 一个独立的Python进程，使用APScheduler定时调用Selenium，模拟浏览器抓取最新的金银价格并存入数据库。
+## ✨ 主要功能
 
-这种架构实现了Web服务和后台任务的完全分离，确保了生产环境的稳定性和可扩展性。
+- **实时价格追踪**: 后台服务定时从 `huangjinjiage.com.cn` 抓取最新的黄金与白银价格。
+- **历史价格图表**: 在首页以动态图表形式展示过去30天的价格走势。
+- **多维度数据分析**: 自动计算并展示7日、15日、30日的平均价格与最低价格。
+- **个人持仓管理**:
+    - 添加、删除持仓记录（描述、重量、金额、日期）。
+    - 实时计算每笔持仓的当前价值与浮动盈亏。
+    - 汇总统计总持仓、总成本、总价值与总盈亏。
+- **高级筛选与排序**: 在持仓页面，可通过紧凑的下拉菜单按日期范围筛选或按重量/日期排序，操作后列表自动刷新。
+- **后台管理**: 提供一个简单的后台页面，用于手动添加、编辑或删除历史价格数据。
+- **安全登录**: 通过独立的登录页面保护用户数据。
+- **现代化UI/UX**:
+    - 全站采用优雅的**暗黑主题**。
+    - **响应式设计**，在PC端和移动端均有良好体验。
+    - 移动端采用**底部固定导航栏**，核心操作触手可及。
 
-#### 2. 环境要求 (Prerequisites)
+## 📸 界面预览
 
--   **操作系统**: CentOS 7/8 或兼容的Linux发行版 (如AlmaLinux, Rocky Linux)。
--   **Python**: 3.10 或更高版本。
--   **工具**: `git`, `wget`, `unzip`。
+| 行情首页 (PC) | 我的持仓 (PC) |
+| :---: | :---: |
+| `[此处放置您的首页截图]` | `[此处放置您的持仓页截图]` |
+| *展示实时价格、分析数据和历史图表* | *展示持仓列表、汇总信息和下拉筛选菜单* |
 
-#### 3. `requirements.txt` 文件
+| 移动端视图 |
+| :---: |
+| `[此处放置您的移动端截图]` |
+| *底部固定导航栏，适配小屏幕* |
 
-在您的项目根目录下，确保 `requirements.txt` 文件内容如下：
 
-```text
-# Flask and related
-Flask==3.0.0
-Flask-SQLAlchemy==3.1.1
-SQLAlchemy==2.0.22
-Jinja2==3.1.2
+## 🛠️ 技术栈
 
-# Web Scraping & Automation (Switched to Selenium)
-selenium==4.15.0
+- **后端**: Python 3.9, Flask, SQLAlchemy, Flask-Migrate, APScheduler
+- **前端**: HTML, CSS, JavaScript, Bootstrap 5, Chart.js
+- **数据库**: SQLite
+- **数据源**: `res.huangjinjiage.com.cn` JS接口
 
-# Background Tasks
-APScheduler==3.10.4
+## 🚀 部署与运行
 
-# HTTP Requests
-requests==2.31.0
-```
+### 1. 环境准备
 
----
+- 确保您的服务器已安装 **Python 3.9** 和 **Git**。
 
-### **部署步骤 (Step-by-Step Guide)**
-
-#### **第 1 步：获取代码并创建虚拟环境**
+### 2. 克隆与安装
 
 ```bash
-# 克隆您的项目 (如果需要)
-# git clone [your-repo-url]
-# cd [your-project-folder]
+# 克隆项目到本地
+git clone <your-repository-url>
+cd gold-tracker
 
 # 创建并激活Python虚拟环境
-python3 -m venv .venv
-source .venv/bin/activate
-```
+python3.9 -m venv venv
+source venv/bin/activate
 
-#### **第 2 步：安装Python依赖包**
-
-```bash
+# 安装所有依赖
 pip install -r requirements.txt
 ```
 
-#### **第 3 步：安装Selenium环境依赖 (核心步骤)**
+### 3. 初始化配置
 
-这一步将在服务器上安装Selenium运行所需的浏览器和驱动程序。
+- **设置登录凭证**:
+  打开 `app.py` 文件，修改以下两行以设置您自己的管理员用户名和密码：
+  ```python
+  CONFIG_USERNAME = 'your_username'
+  CONFIG_PASSWORD = 'your_strong_password'
+  ```
 
-1.  **安装 Google Chrome 浏览器**:
-    ```bash
-    # 下载官方的 .rpm 安装包
-    wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
-    
-    # 使用 yum localinstall 来安装，它会自动处理所有系统依赖
-    yum localinstall -y google-chrome-stable_current_x86_64.rpm
-    
-    # 清理下载的安装包
-    rm google-chrome-stable_current_x86_64.rpm
-    ```
+- **初始化数据库**:
+  在项目根目录下，依次执行以下命令来创建数据库和迁移文件。
+  ```bash
+  # (仅在首次部署时需要) 初始化迁移环境
+  flask db init
 
-2.  **验证 Chrome 安装**:
-    ```bash
-    which google-chrome
-    # 预期输出: /usr/bin/google-chrome
-    
-    google-chrome --version
-    # 记下版本号，例如: Google Chrome 143.0.7499.169
-    ```
+  # (仅在首次部署时需要) 创建第一个迁移脚本
+  flask db migrate -m "Initial migration"
+  
+  # 将迁移应用到数据库，创建所有表
+  flask db upgrade
+  ```
 
-3.  **安装匹配的 ChromeDriver**:
-    ChromeDriver的版本**必须**与Chrome浏览器的版本**主版本号一致**。
+### 4. 运行应用 (生产环境)
 
-    a. **访问官方镜像站**: [Chrome for Testing availability](https://googlechromelabs.github.io/chrome-for-testing/)
-    b. **找到匹配版本**: 根据上一步记下的版本号，找到对应的ChromeDriver下载链接。
-    c. **下载、解压并安装**: (**请将下面的版本号替换为您自己的版本号**)
-    ```bash
-    # 示例：为 Chrome 143.0.7499.169 下载驱动
-    wget https://storage.googleapis.com/chrome-for-testing-public/143.0.7499.169/linux64/chromedriver-linux64.zip
-    
-    # 解压
-    unzip chromedriver-linux64.zip
-    
-    # 移动到系统的可执行路径中
-    mv chromedriver-linux64/chromedriver /usr/local/bin/
-    
-    # 赋予执行权限
-    chmod +x /usr/local/bin/chromedriver
-    
-    # 清理下载文件
-    rm chromedriver-linux64.zip
-    rm -rf chromedriver-linux64
-    ```
+推荐使用 Gunicorn 作为Web服务器。您需要打开两个终端会话或使用后台运行。
 
-4.  **验证 ChromeDriver 安装**:
-    ```bash
-    chromedriver --version
-    # 预期输出的版本号应与您的Chrome版本匹配
-    ```
+- **启动后台价格抓取服务**:
+  ```bash
+  # 使用 nohup 保证进程在您退出终端后依然运行
+  # 日志将输出到 scheduler.log 文件
+  nohup python -u scheduler.py >> scheduler.log 2>&1 &
+  ```
 
-#### **第 4 步：初始化数据库**
+- **启动Web应用服务**:
+  ```bash
+  # 启动 Gunicorn，开启4个工作进程，监听在5000端口
+  gunicorn -w 4 -b 0.0.0.0:5000 app:app &
+  ```
 
+现在，您可以通过 `http://<您的服务器IP>:5000` 访问您的黄金持仓追踪器了！
+
+### 5. 本地开发
+
+如果您想在本地进行开发和测试，只需运行：
 ```bash
-# 确保 instance 目录存在，并创建数据库表
-flask init-db
+python app.py
+```
+这会启动一个内置的开发服务器，当代码变动时会自动重启。
+
+## 📁 文件结构说明
+
+```
+/gold-tracker
+├── app.py                  # Flask 主应用文件
+├── scheduler.py            # 后台定时任务文件
+├── requirements.txt        # Python 依赖列表 (兼容Python 3.9)
+├── instance/
+│   └── portfolio.db        # SQLite 数据库文件 (自动生成)
+├── migrations/             # Flask-Migrate 数据库迁移文件夹
+│   ├── versions/
+│   │   └── ..._migration_scripts.py
+│   ├── alembic.ini
+│   └── env.py
+└── templates/
+    ├── layout.html         # 全局基础模板 (含导航栏)
+    ├── index.html          # 行情首页 (调用 partial)
+    ├── portfolio.html      # 我的持仓页面
+    ├── login.html          # 登录页面
+    ├── manage_prices.html  # 后台价格管理页面
+    └── partials/           # 可复用的HTML模板片段
+        └── metal_info.html # 行情卡片模板
 ```
 
-#### **第 5 步：启动应用 (双进程)**
+## 📄 许可证
 
-您需要启动两个独立的、长期运行的进程。
-
-1.  **启动 Gunicorn Web 服务器 (处理用户访问)**:
-    ```bash
-    # 激活虚拟环境 (如果终端是新的)
-    # source .venv/bin/activate
-    
-    nohup gunicorn --workers 3 --bind 0.0.0.0:5000 app:app &
-    ```
-    -   `--workers 3`: 启动3个工作进程处理请求，可根据服务器CPU核心数调整。
-    -   `--bind 0.0.0.0:5000`: 监听服务器所有IP的5000端口。
-    -   `nohup ... &`: 让服务在后台持续运行。
-
-2.  **启动后台调度器服务 (执行定时抓取)**:
-    ```bash
-    nohup python -u scheduler.py >> scheduler.log 2>&1 &
-    ```
-    -   `python -u`: `-u`参数确保Python的`print`输出**不被缓冲**，日志会立即写入文件。
-    -   `>> scheduler.log`: 将所有**正常输出**追加到 `scheduler.log` 文件。
-    -   `2>&1`: 将所有**错误输出**也重定向到与正常输出相同的地方（即 `scheduler.log`）。
-
----
-
-### **日常管理与维护**
-
-#### **查看后台任务日志**
-
-要实时监控Selenium抓取任务的运行情况，使用`tail`命令：
-```bash
-tail -f scheduler.log
-```
-按 `Ctrl+C` 退出监控，不会影响后台进程。
-
-#### **查看Gunicorn日志**
-
-Gunicorn的输出默认可能也在 `nohup.out` 文件中，或者您可以配置其日志路径。
-
-#### **停止服务**
-
-如果需要更新或停止服务，您需要分别停止两个进程。
-
-1.  **找到进程ID (PID)**:
-    ```bash
-    # 查找 Gunicorn 进程
-    ps aux | grep gunicorn
-    
-    # 查找调度器进程
-    ps aux | grep scheduler.py
-    ```
-
-2.  **停止进程**:
-    使用 `kill` 命令，并带上您找到的PID。
-    ```bash
-    # 示例:
-    kill [gunicorn_master_process_pid]
-    kill [scheduler_pid]
-    ```
-    
-3. **新增字段**:
-在 app.py 里修改模型类。
-运行 flask db migrate -m "一句话说明你做了什么改动"。
-运行 flask db upgrade。
+本项目采用 [MIT](https://choosealicense.com/licenses/mit/) 许可证。
